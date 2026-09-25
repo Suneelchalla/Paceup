@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0A0E14">
+  <meta name="description" content="PaceUp — Your AI virtual pacer. Voice-guided running companion for every run type.">
+  <title>PaceUp — Virtual Pacer</title>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+  <!-- Leaflet CSS (maps) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+
+  <!-- App CSS -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ===================== HOME SCREEN ===================== -->
+  <div id="home" class="screen active">
+    <div class="home-header">
+      <div class="logo">PACEUP</div>
+      <h1>Your virtual pacer</h1>
+      <p>Choose your run type. Your pacer adapts its voice and behavior to match.</p>
+    </div>
+    <div class="run-types">
+      <div class="run-type-card" data-type="easy">
+        <div class="run-type-icon icon-easy">🚶</div>
+        <div class="run-type-info">
+          <h3>Easy Run</h3>
+          <p>Recovery pace. The pacer keeps you from going too fast.</p>
+        </div>
+      </div>
+      <div class="run-type-card" data-type="tempo">
+        <div class="run-type-icon icon-tempo">⚡</div>
+        <div class="run-type-info">
+          <h3>Tempo Run</h3>
+          <p>Comfortably hard. Hold a steady pace in a tight band.</p>
+        </div>
+      </div>
+      <div class="run-type-card" data-type="intervals">
+        <div class="run-type-icon icon-intervals">🔥</div>
+        <div class="run-type-info">
+          <h3>Intervals</h3>
+          <p>400m / 800m drills. Work and rest with rep tracking.</p>
+        </div>
+      </div>
+      <div class="run-type-card" data-type="long">
+        <div class="run-type-icon icon-long">🏔️</div>
+        <div class="run-type-info">
+          <h3>Long Run</h3>
+          <p>Build endurance. Gentle pace checks, patient coaching.</p>
+        </div>
+      </div>
+      <div class="run-type-card" data-type="race">
+        <div class="run-type-icon icon-race">🏁</div>
+        <div class="run-type-info">
+          <h3>Race Mode</h3>
+          <p>5K to full marathon. Set a goal time, get split-by-split pacing.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== SETUP SCREEN ===================== -->
+  <div id="setup" class="screen">
+    <div class="setup-header">
+      <button class="back-btn" id="btn-back-home">←</button>
+      <h2 id="setup-title">Setup</h2>
+    </div>
+    <div id="setup-fields"></div>
+  </div>
+
+  <!-- ===================== ACTIVE RUN SCREEN ===================== -->
+  <div id="active-run" class="screen">
+    <div class="run-map-area">
+      <div id="map"></div>
+
+      <!-- Pace status overlay -->
+      <div class="pace-bar">
+        <div class="pace-status">
+          <span class="pace-dot green" id="pace-dot"></span>
+          <span id="pace-status-text">Waiting...</span>
+        </div>
+        <span class="run-type-badge" id="run-type-badge">EASY</span>
+      </div>
+
+      <!-- Map buttons -->
+      <button class="voice-toggle" id="voice-toggle-btn">🔊</button>
+      <button class="center-btn" id="center-btn">◎</button>
+
+      <!-- GPS acquiring overlay -->
+      <div class="gps-overlay" id="gps-overlay">
+        <div class="gps-spinner"></div>
+        <p id="gps-overlay-msg">Acquiring GPS signal...</p>
+      </div>
+
+      <!-- Countdown overlay -->
+      <div class="countdown-overlay hidden" id="countdown-overlay">
+        <div class="countdown-num" id="countdown-num">3</div>
+      </div>
+    </div>
+
+    <!-- Bottom stats panel -->
+    <div class="stats-panel">
+      <div class="interval-bar" id="interval-bar">
+        <span class="rep-info" id="rep-info">Rep 1 / 8</span>
+        <span class="phase-badge phase-work" id="phase-badge">WORK</span>
+      </div>
+
+      <div class="stats-main">
+        <div class="big-pace">
+          <div class="value" id="current-pace">--:--</div>
+          <div class="label">current pace (min/km)</div>
+          <div class="target-indicator" id="target-indicator"></div>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-cell">
+          <div class="val" id="stat-distance">0.00</div>
+          <div class="lbl">km</div>
+        </div>
+        <div class="stat-cell">
+          <div class="val" id="stat-time">00:00</div>
+          <div class="lbl">time</div>
+        </div>
+        <div class="stat-cell">
+          <div class="val" id="stat-avg-pace">--:--</div>
+          <div class="lbl">avg pace</div>
+        </div>
+      </div>
+
+      <div class="run-controls">
+        <button class="ctrl-btn btn-lock" id="lock-btn">🔒</button>
+        <button class="ctrl-btn btn-pause" id="pause-btn">⏸ Pause</button>
+        <button class="ctrl-btn btn-stop" id="stop-btn">⏹</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== SUMMARY SCREEN ===================== -->
+  <div id="summary" class="screen">
+    <div class="summary-header">
+      <div class="check">✓</div>
+      <h2>Run Complete</h2>
+      <p id="summary-subtitle"></p>
+    </div>
+    <div class="summary-stats" id="summary-stats"></div>
+    <div id="summary-map"></div>
+    <div class="splits-section" id="splits-section">
+      <h3>Kilometer Splits</h3>
+      <div id="splits-list"></div>
+    </div>
+    <button class="done-btn" id="btn-done">Done</button>
+    <button class="done-btn export-btn" id="btn-export">📤 Export GPX</button>
+  </div>
+
+  <!-- ===================== SCRIPTS ===================== -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="js/gps.js"></script>
+  <script src="js/voice.js"></script>
+  <script src="js/pacer.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    // Register service worker for PWA / offline support
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(reg => console.log('SW registered:', reg.scope))
+          .catch(err => console.log('SW registration failed:', err));
+      });
+    }
+  </script>
+</body>
+</html>
