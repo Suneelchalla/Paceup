@@ -748,3 +748,164 @@ body {
   color: var(--green);
   margin-bottom: 32px;
 }
+
+/* ============================================================
+   LOCK SCREEN OVERLAY
+   Covers entire screen, blocks all touches underneath.
+   Only the "hold to unlock" button is interactive.
+   ============================================================ */
+.lock-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 40px 24px;
+  /* Prevent ANY touch passthrough */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.lock-overlay.hidden {
+  display: none;
+}
+
+.lock-stats {
+  display: flex;
+  gap: 32px;
+  margin-bottom: 20px;
+}
+.lock-stat {
+  text-align: center;
+}
+.lock-stat-val {
+  font-size: 36px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.lock-stat-lbl {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.lock-icon {
+  font-size: 48px;
+  opacity: 0.5;
+}
+.lock-hint {
+  font-size: 14px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.unlock-area {
+  margin-top: 32px;
+  width: 100%;
+  max-width: 280px;
+}
+.unlock-btn {
+  width: 100%;
+  height: 56px;
+  border-radius: 28px;
+  border: 2px solid rgba(255,255,255,0.15);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
+}
+.unlock-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 0%;
+  background: var(--green);
+  border-radius: 28px;
+  transition: width 0.05s linear;
+  pointer-events: none;
+}
+.unlock-text {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Lock overlay also shows a timer that updates */
+.lock-overlay .lock-stat-val {
+  transition: none;
+}
+
+/* ============================================================
+   STOP CONFIRM MODAL
+   ============================================================ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 8000;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.modal-overlay.hidden {
+  display: none;
+}
+.modal-box {
+  background: var(--surface);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius);
+  padding: 28px 24px;
+  width: 100%;
+  max-width: 320px;
+  text-align: center;
+}
+.modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.modal-subtitle {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-bottom: 24px;
+}
+.modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.modal-btn {
+  width: 100%;
+  padding: 14px;
+  border-radius: var(--radius-sm);
+  border: none;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+.modal-cancel {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.modal-confirm {
+  background: var(--red);
+  color: #fff;
+}
