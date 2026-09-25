@@ -161,6 +161,44 @@
     <button class="done-btn export-btn" id="btn-export">📤 Export GPX</button>
   </div>
 
+  <!-- ===================== LOCK SCREEN OVERLAY ===================== -->
+  <div id="lock-overlay" class="lock-overlay hidden">
+    <div class="lock-stats">
+      <div class="lock-stat">
+        <div class="lock-stat-val" id="lock-pace">--:--</div>
+        <div class="lock-stat-lbl">pace</div>
+      </div>
+      <div class="lock-stat">
+        <div class="lock-stat-val" id="lock-dist">0.00</div>
+        <div class="lock-stat-lbl">km</div>
+      </div>
+      <div class="lock-stat">
+        <div class="lock-stat-val" id="lock-time">00:00</div>
+        <div class="lock-stat-lbl">time</div>
+      </div>
+    </div>
+    <div class="lock-icon">🔒</div>
+    <p class="lock-hint">Screen locked — safe for pocket</p>
+    <div class="unlock-area">
+      <button class="unlock-btn" id="unlock-btn">
+        <span class="unlock-fill" id="unlock-fill"></span>
+        <span class="unlock-text">Hold to unlock</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===================== STOP CONFIRM MODAL ===================== -->
+  <div id="stop-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <p class="modal-title">End this run?</p>
+      <p class="modal-subtitle" id="stop-modal-info"></p>
+      <div class="modal-actions">
+        <button class="modal-btn modal-cancel" id="stop-cancel">Continue run</button>
+        <button class="modal-btn modal-confirm" id="stop-confirm">End run</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===================== SCRIPTS ===================== -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="js/gps.js"></script>
