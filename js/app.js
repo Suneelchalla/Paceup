@@ -1,6 +1,9 @@
 /* ============================================================
-   PaceUp — App Controller
+   PaceUp — App Controller (FIXED)
    State management, run lifecycle, event wiring
+   - Lock overlay: full-screen touch blocker with hold-to-unlock
+   - Stop: custom modal instead of broken confirm()
+   - Wake lock: persistent, re-acquires on visibility change
    ============================================================ */
 
 const App = (() => {
@@ -16,18 +19,23 @@ const App = (() => {
     pausedDuration: 0,
     pauseStart: null,
     totalDistance: 0,
-    positions: [],       // { lat, lon, ts, accuracy }
+    positions: [],
     speeds: [],
     splits: [],
     lastSplitTime: 0,
     lastVoiceTime: 0,
     watchId: null,
     timerInterval: null,
+    wakeLock: null,
     // Interval-specific
     intervalPhase: 'work',
     intervalRep: 0,
     intervalPhaseDist: 0,
     intervalRestTimer: null,
+    // Unlock hold tracking
+    unlockTimer: null,
+    unlockStart: 0,
+    unlockRAF: null,
   };
 
   // ─── Elapsed time ───
@@ -40,6 +48,8 @@ const App = (() => {
   // ─── Navigation ───
   function goHome() {
     stopRun(true);
+    UI.showLockOverlay(false);
+    UI.hideStopModal();
     UI.showScreen('home');
   }
 
@@ -55,8 +65,10 @@ const App = (() => {
     Voice.init();
 
     // Home screen — run type cards
-    document.querySelectorAll('.run-type-card').forEach(card => {
-      card.addEventListener('click', () => selectRunType(card.dataset.type));
+    document.querySelectorAll('.run-type-card').forEach(function(card) {
+      card.addEventListener('click', function() {
+        selectRunType(card.dataset.type);
+      });
     });
 
     // Back button
@@ -66,34 +78,143 @@ const App = (() => {
     document.getElementById('voice-toggle-btn').addEventListener('click', toggleVoice);
     document.getElementById('center-btn').addEventListener('click', centerMap);
     document.getElementById('pause-btn').addEventListener('click', pauseRun);
-    document.getElementById('stop-btn').addEventListener('click', confirmStop);
-    document.getElementById('lock-btn').addEventListener('click', toggleLock);
+    document.getElementById('stop-btn').addEventListener('click', requestStop);
+    document.getElementById('lock-btn').addEventListener('click', lockScreen);
+
+    // Stop modal buttons
+    document.getElementById('stop-cancel').addEventListener('click', function() {
+      UI.hideStopModal();
+    });
+    document.getElementById('stop-confirm').addEventListener('click', function() {
+      UI.hideStopModal();
+      stopRun(false);
+    });
+
+    // Unlock button — hold for 2 seconds to unlock
+    initUnlockButton();
 
     // Summary
     document.getElementById('btn-done').addEventListener('click', goHome);
     document.getElementById('btn-export').addEventListener('click', exportGPX);
+
+    // Re-acquire wake lock when page becomes visible again
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'visible' && state.isRunning) {
+        requestWakeLock();
+      }
+    });
   }
 
   function bindSetupEvents() {
-    // Pill selectors
-    document.querySelectorAll('.pill-group .pill').forEach(pill => {
-      pill.addEventListener('click', () => {
-        pill.parentElement.querySelectorAll('.pill').forEach(p => p.classList.remove('selected'));
+    document.querySelectorAll('.pill-group .pill').forEach(function(pill) {
+      pill.addEventListener('click', function() {
+        pill.parentElement.querySelectorAll('.pill').forEach(function(p) {
+          p.classList.remove('selected');
+        });
         pill.classList.add('selected');
       });
     });
 
-    // Voice toggle
-    const toggle = document.getElementById('toggle-voice');
+    var toggle = document.getElementById('toggle-voice');
     if (toggle) {
-      toggle.addEventListener('click', () => toggle.classList.toggle('on'));
+      toggle.addEventListener('click', function() {
+        toggle.classList.toggle('on');
+      });
     }
 
-    // Start button
-    const startBtn = document.getElementById('btn-start-run');
+    var startBtn = document.getElementById('btn-start-run');
     if (startBtn) {
       startBtn.addEventListener('click', startRun);
     }
+  }
+
+  // ─── LOCK SCREEN ───
+
+  function lockScreen() {
+    state.isLocked = true;
+    UI.showLockOverlay(true);
+  }
+
+  function unlockScreen() {
+    state.isLocked = false;
+    UI.showLockOverlay(false);
+  }
+
+  function initUnlockButton() {
+    var btn = document.getElementById('unlock-btn');
+    var fill = document.getElementById('unlock-fill');
+    var HOLD_DURATION = 2000; // 2 seconds
+
+    function startHold(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      state.unlockStart = Date.now();
+
+      // Animate the fill bar
+      function animateFill() {
+        var elapsed = Date.now() - state.unlockStart;
+        var pct = Math.min((elapsed / HOLD_DURATION) * 100, 100);
+        fill.style.width = pct + '%';
+
+        if (pct >= 100) {
+          // Unlock!
+          fill.style.width = '0%';
+          unlockScreen();
+          return;
+        }
+        state.unlockRAF = requestAnimationFrame(animateFill);
+      }
+      state.unlockRAF = requestAnimationFrame(animateFill);
+    }
+
+    function endHold(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (state.unlockRAF) {
+        cancelAnimationFrame(state.unlockRAF);
+        state.unlockRAF = null;
+      }
+      fill.style.width = '0%';
+      state.unlockStart = 0;
+    }
+
+    // Touch events
+    btn.addEventListener('touchstart', startHold, { passive: false });
+    btn.addEventListener('touchend', endHold, { passive: false });
+    btn.addEventListener('touchcancel', endHold, { passive: false });
+
+    // Mouse events (for desktop testing)
+    btn.addEventListener('mousedown', startHold);
+    btn.addEventListener('mouseup', endHold);
+    btn.addEventListener('mouseleave', endHold);
+
+    // Block ALL touches on the lock overlay except the unlock button
+    document.getElementById('lock-overlay').addEventListener('touchstart', function(e) {
+      // Only allow touches on the unlock button
+      if (!btn.contains(e.target)) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, { passive: false });
+
+    document.getElementById('lock-overlay').addEventListener('touchmove', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }, { passive: false });
+  }
+
+  // ─── STOP (with custom modal) ───
+
+  function requestStop() {
+    // If very short run, just stop directly
+    if (state.totalDistance < 100) {
+      stopRun(false);
+      return;
+    }
+    // Show custom modal instead of browser confirm()
+    var distKm = (state.totalDistance / 1000).toFixed(2);
+    var timeStr = GPS.formatTime(getElapsed());
+    UI.showStopModal(distKm, timeStr);
   }
 
   // ─── Start run ───
@@ -110,7 +231,7 @@ const App = (() => {
       state.intervalPhase = 'work';
       state.intervalPhaseDist = 0;
       state.config._intervalPhase = 'work';
-      UI.updateIntervalBar(`Rep 1 / ${state.config.reps}`, 'work');
+      UI.updateIntervalBar('Rep 1 / ' + state.config.reps, 'work');
     }
 
     // Reset state
@@ -124,7 +245,8 @@ const App = (() => {
     state.isPaused = false;
     state.isLocked = false;
     UI.setPauseButton(false);
-    UI.setLockButton(false);
+    UI.showLockOverlay(false);
+    UI.hideStopModal();
 
     // Show GPS overlay
     UI.showGPSOverlay(true);
@@ -137,12 +259,12 @@ const App = (() => {
     }
 
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      function(pos) {
         MapManager.initRun('map', pos.coords.latitude, pos.coords.longitude);
         UI.showGPSOverlay(false);
         runCountdown();
       },
-      (err) => {
+      function(err) {
         UI.setGPSMessage('GPS error: ' + err.message + '. Enable location access and retry.');
       },
       { enableHighAccuracy: true, timeout: 15000 }
@@ -151,11 +273,11 @@ const App = (() => {
 
   function runCountdown() {
     UI.showCountdown(true);
-    let count = 3;
+    var count = 3;
     UI.setCountdownNumber(count);
     Voice.speak(String(count));
 
-    const iv = setInterval(() => {
+    var iv = setInterval(function() {
       count--;
       if (count > 0) {
         UI.setCountdownNumber(count);
@@ -175,14 +297,17 @@ const App = (() => {
     // GPS watch
     state.watchId = navigator.geolocation.watchPosition(
       onGPS,
-      (err) => console.warn('GPS error:', err.message),
+      function(err) { console.warn('GPS error:', err.message); },
       { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
     );
 
-    // Timer tick
-    state.timerInterval = setInterval(() => {
+    // Timer tick — updates both main screen and lock screen
+    state.timerInterval = setInterval(function() {
       if (!state.isPaused) {
-        document.getElementById('stat-time').textContent = GPS.formatTime(getElapsed());
+        var t = GPS.formatTime(getElapsed());
+        document.getElementById('stat-time').textContent = t;
+        // Also update lock screen time
+        document.getElementById('lock-time').textContent = t;
       }
     }, 500);
 
@@ -197,16 +322,15 @@ const App = (() => {
   function onGPS(pos) {
     if (!state.isRunning || state.isPaused) return;
 
-    const result = GPS.processPosition(pos, state.positions);
+    var result = GPS.processPosition(pos, state.positions);
     if (!result) return;
 
     if (result.dist > 0) {
       state.totalDistance += result.dist;
       state.speeds.push(result.speed);
 
-      // Check km split
-      const kmNow = Math.floor(state.totalDistance / 1000);
-      const kmPrev = Math.floor((state.totalDistance - result.dist) / 1000);
+      var kmNow = Math.floor(state.totalDistance / 1000);
+      var kmPrev = Math.floor((state.totalDistance - result.dist) / 1000);
       if (kmNow > kmPrev && kmNow > 0) {
         recordSplit(kmNow);
       }
@@ -214,10 +338,10 @@ const App = (() => {
 
     state.positions.push(result);
 
-    // Update map
+    // Update map (follow only if not locked)
     MapManager.addPoint(result.lat, result.lon, !state.isLocked);
 
-    // Update UI
+    // Update UI (both main stats and lock screen stats)
     updateStats();
 
     // Voice cues
@@ -228,20 +352,19 @@ const App = (() => {
   }
 
   function recordSplit(km) {
-    const elapsed = getElapsed();
-    const splitTime = elapsed - state.lastSplitTime;
-    state.splits.push({ km, time: splitTime, totalTime: elapsed });
+    var elapsed = getElapsed();
+    var splitTime = elapsed - state.lastSplitTime;
+    state.splits.push({ km: km, time: splitTime, totalTime: elapsed });
     state.lastSplitTime = elapsed;
-
     Voice.speak(Voice.splitMessage(km, GPS.formatPace(splitTime)));
   }
 
   function updateStats() {
-    const speed = GPS.smoothSpeed(state.speeds, 8);
-    const pace = GPS.speedToPace(speed);
-    const distKm = (state.totalDistance / 1000).toFixed(2);
-    const elapsed = getElapsed();
-    const avgPace = state.totalDistance > 10
+    var speed = GPS.smoothSpeed(state.speeds, 8);
+    var pace = GPS.speedToPace(speed);
+    var distKm = (state.totalDistance / 1000).toFixed(2);
+    var elapsed = getElapsed();
+    var avgPace = state.totalDistance > 10
       ? (elapsed / state.totalDistance) * 1000
       : 0;
 
@@ -252,21 +375,21 @@ const App = (() => {
       GPS.formatPace(avgPace)
     );
 
-    const status = Pacer.getPaceStatus(state.runType, state.config, pace);
+    var status = Pacer.getPaceStatus(state.runType, state.config, pace);
     UI.updatePaceDisplay(status);
   }
 
   function checkVoice() {
-    const elapsed = getElapsed();
+    var elapsed = getElapsed();
     if (!Pacer.shouldSpeak(elapsed, state.lastVoiceTime, state.config.voiceFreq)) return;
     state.lastVoiceTime = elapsed;
 
-    const speed = GPS.smoothSpeed(state.speeds, 8);
-    const pace = GPS.speedToPace(speed);
+    var speed = GPS.smoothSpeed(state.speeds, 8);
+    var pace = GPS.speedToPace(speed);
     if (pace <= 0 || !isFinite(pace)) return;
 
-    const paceStr = GPS.formatPace(pace);
-    const msg = Voice.paceCue(
+    var paceStr = GPS.formatPace(pace);
+    var msg = Voice.paceCue(
       state.runType, state.config, paceStr, pace, elapsed, state.totalDistance
     );
     Voice.speak(msg);
@@ -274,13 +397,13 @@ const App = (() => {
 
   // ─── Interval logic ───
   function checkInterval() {
-    const cfg = state.config;
+    var cfg = state.config;
     if (state.intervalPhase !== 'work') return;
 
-    const distInRep = state.totalDistance - state.intervalPhaseDist;
+    var distInRep = state.totalDistance - state.intervalPhaseDist;
     if (distInRep >= cfg.repDist) {
       state.intervalRep++;
-      UI.updateIntervalBar(`Rep ${state.intervalRep} / ${cfg.reps}`, 'work');
+      UI.updateIntervalBar('Rep ' + state.intervalRep + ' / ' + cfg.reps, 'work');
 
       if (Pacer.isIntervalComplete(state.intervalRep, cfg.reps)) {
         Voice.speak(Voice.intervalRepDone(state.intervalRep, cfg.reps, 0));
@@ -289,13 +412,12 @@ const App = (() => {
 
       Voice.speak(Voice.intervalRepDone(state.intervalRep, cfg.reps, cfg.restSeconds));
 
-      // Switch to rest
       state.intervalPhase = 'rest';
       state.config._intervalPhase = 'rest';
-      UI.updateIntervalBar(`Rep ${state.intervalRep} / ${cfg.reps}`, 'rest');
+      UI.updateIntervalBar('Rep ' + state.intervalRep + ' / ' + cfg.reps, 'rest');
 
-      let restLeft = cfg.restSeconds;
-      state.intervalRestTimer = setInterval(() => {
+      var restLeft = cfg.restSeconds;
+      state.intervalRestTimer = setInterval(function() {
         restLeft--;
         if (restLeft === 30) Voice.speak('30 seconds to next rep.');
         if (restLeft === 10) Voice.speak('10 seconds. Get ready.');
@@ -305,8 +427,8 @@ const App = (() => {
           state.intervalPhase = 'work';
           state.config._intervalPhase = 'work';
           state.intervalPhaseDist = state.totalDistance;
-          UI.updateIntervalBar(`Rep ${state.intervalRep + 1} / ${cfg.reps}`, 'work');
-          Voice.speak(`Rep ${state.intervalRep + 1}. Go!`);
+          UI.updateIntervalBar('Rep ' + (state.intervalRep + 1) + ' / ' + cfg.reps, 'work');
+          Voice.speak('Rep ' + (state.intervalRep + 1) + '. Go!');
         }
       }, 1000);
     }
@@ -314,6 +436,8 @@ const App = (() => {
 
   // ─── Controls ───
   function pauseRun() {
+    if (state.isLocked) return; // Can't pause while locked
+
     if (!state.isPaused) {
       state.isPaused = true;
       state.pauseStart = Date.now();
@@ -327,20 +451,10 @@ const App = (() => {
     }
   }
 
-  function confirmStop() {
-    if (state.isLocked) return;
-    if (state.totalDistance < 100) {
-      stopRun(false);
-      return;
-    }
-    if (confirm('End this run?')) {
-      stopRun(false);
-    }
-  }
-
   function stopRun(silent) {
     state.isRunning = false;
     state.isPaused = false;
+    state.isLocked = false;
 
     if (state.watchId != null) {
       navigator.geolocation.clearWatch(state.watchId);
@@ -354,7 +468,11 @@ const App = (() => {
       clearInterval(state.intervalRestTimer);
       state.intervalRestTimer = null;
     }
+
     Voice.cancel();
+    releaseWakeLock();
+    UI.showLockOverlay(false);
+    UI.hideStopModal();
 
     if (!silent && state.totalDistance > 50) {
       showSummary();
@@ -362,19 +480,14 @@ const App = (() => {
   }
 
   function toggleVoice() {
-    const nowEnabled = !Voice.isEnabled();
+    var nowEnabled = !Voice.isEnabled();
     Voice.setEnabled(nowEnabled);
     UI.setVoiceToggle(nowEnabled);
   }
 
-  function toggleLock() {
-    state.isLocked = !state.isLocked;
-    UI.setLockButton(state.isLocked);
-  }
-
   function centerMap() {
     if (state.positions.length > 0) {
-      const last = state.positions[state.positions.length - 1];
+      var last = state.positions[state.positions.length - 1];
       MapManager.centerOn(last.lat, last.lon);
     }
   }
@@ -383,9 +496,9 @@ const App = (() => {
   function showSummary() {
     UI.showScreen('summary');
 
-    const elapsed = getElapsed();
-    const distKm = state.totalDistance / 1000;
-    const avgPace = state.totalDistance > 10
+    var elapsed = getElapsed();
+    var distKm = state.totalDistance / 1000;
+    var avgPace = state.totalDistance > 10
       ? GPS.formatPace((elapsed / state.totalDistance) * 1000)
       : '--:--';
 
@@ -396,12 +509,22 @@ const App = (() => {
 
     Voice.speak(Voice.endMessage(distKm, elapsed, avgPace));
 
-    // Summary map
     if (state.positions.length > 2) {
       MapManager.initSummary('summary-map', state.positions);
     } else {
       document.getElementById('summary-map').innerHTML =
         '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-dim);font-size:14px;">Route too short to display</div>';
+    }
+
+    // Save to history
+    if (typeof History !== 'undefined' && History.createRecord) {
+      var avgPaceVal = state.totalDistance > 10
+        ? (elapsed / state.totalDistance) * 1000 : 0;
+      var record = History.createRecord(
+        state.runType, state.config, state.totalDistance,
+        elapsed, avgPaceVal, state.splits, state.positions
+      );
+      History.save(record);
     }
   }
 
@@ -412,12 +535,12 @@ const App = (() => {
       return;
     }
 
-    const name = UI.RUN_TYPE_NAMES[state.runType] + ' - ' + new Date().toLocaleDateString();
-    const gpx = GPS.generateGPX(state.positions, name, state.startTime);
+    var name = UI.RUN_TYPE_NAMES[state.runType] + ' - ' + new Date().toLocaleDateString();
+    var gpx = GPS.generateGPX(state.positions, name, state.startTime);
 
-    const blob = new Blob([gpx], { type: 'application/gpx+xml' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    var blob = new Blob([gpx], { type: 'application/gpx+xml' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
     a.href = url;
     a.download = 'paceup-' + new Date().toISOString().slice(0, 10) + '.gpx';
     document.body.appendChild(a);
@@ -426,14 +549,31 @@ const App = (() => {
     URL.revokeObjectURL(url);
   }
 
-  // ─── Wake lock ───
-  async function requestWakeLock() {
-    try {
-      if ('wakeLock' in navigator) {
-        await navigator.wakeLock.request('screen');
-      }
-    } catch (e) {
-      // Wake lock not supported or failed — non-critical
+  // ─── Wake lock (persistent) ───
+  function requestWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+
+    navigator.wakeLock.request('screen')
+      .then(function(lock) {
+        state.wakeLock = lock;
+        // Re-acquire if released (e.g., tab switch)
+        lock.addEventListener('release', function() {
+          state.wakeLock = null;
+          // Re-acquire if still running
+          if (state.isRunning) {
+            requestWakeLock();
+          }
+        });
+      })
+      .catch(function(err) {
+        console.log('Wake lock failed:', err.message);
+      });
+  }
+
+  function releaseWakeLock() {
+    if (state.wakeLock) {
+      state.wakeLock.release().catch(function() {});
+      state.wakeLock = null;
     }
   }
 
