@@ -1,12 +1,11 @@
 /* ============================================================
-   PaceUp — Service Worker
-   Caches app shell for offline use
+   PaceUp — Service Worker (FIXED)
+   Resilient caching — individual file failures don't block install
    ============================================================ */
 
-const CACHE_NAME = 'paceup-v1';
-// Paths are resolved relative to SW scope at runtime
-const APP_SHELL_RELATIVE = [
-  './',
+const CACHE_NAME = 'paceup-v2';
+
+const APP_FILES = [
   './index.html',
   './css/style.css',
   './js/gps.js',
@@ -14,83 +13,86 @@ const APP_SHELL_RELATIVE = [
   './js/pacer.js',
   './js/map.js',
   './js/ui.js',
+  './js/history.js',
   './js/app.js',
   './manifest.json',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
+  './privacy.html',
 ];
 
-// External CDN resources (cache on first use)
-const CDN_RESOURCES = [
+const CDN_FILES = [
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js',
 ];
 
-// Install — cache app shell
-self.addEventListener('install', (event) => {
+// Install — cache files individually (don't fail on a single 404)
+self.addEventListener('install', function(event) {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(APP_SHELL_RELATIVE);
+    caches.open(CACHE_NAME).then(function(cache) {
+      // Cache each file individually — failures don't block install
+      var promises = APP_FILES.concat(CDN_FILES).map(function(url) {
+        return cache.add(url).catch(function(err) {
+          console.warn('SW: failed to cache', url, err.message);
+        });
+      });
+      return Promise.all(promises);
     })
   );
   self.skipWaiting();
 });
 
 // Activate — clean old caches
-self.addEventListener('activate', (event) => {
+self.addEventListener('activate', function(event) {
   event.waitUntil(
-    caches.keys().then((names) => {
+    caches.keys().then(function(names) {
       return Promise.all(
         names
-          .filter((name) => name !== CACHE_NAME)
-          .map((name) => caches.delete(name))
+          .filter(function(name) { return name !== CACHE_NAME && !name.startsWith(CACHE_NAME); })
+          .map(function(name) { return caches.delete(name); })
       );
     })
   );
   self.clients.claim();
 });
 
-// Fetch — cache-first for app shell, network-first for tiles
-self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
+// Fetch — network first for navigation, cache first for assets
+self.addEventListener('fetch', function(event) {
+  var url = new URL(event.request.url);
 
-  // Map tiles — network first, cache fallback
+  // Map tiles — network first, cache fallback (don't block on tile errors)
   if (url.hostname.includes('tile.openstreetmap.org')) {
     event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME + '-tiles').then((cache) => {
-            cache.put(event.request, clone);
-          });
-          return response;
-        })
-        .catch(() => caches.match(event.request))
-    );
-    return;
-  }
-
-  // CDN resources — cache first
-  if (CDN_RESOURCES.some((r) => event.request.url.startsWith(r))) {
-    event.respondWith(
-      caches.match(event.request).then((cached) => {
-        if (cached) return cached;
-        return fetch(event.request).then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, clone);
-          });
-          return response;
+      fetch(event.request).then(function(response) {
+        var clone = response.clone();
+        caches.open(CACHE_NAME + '-tiles').then(function(cache) {
+          cache.put(event.request, clone);
         });
+        return response;
+      }).catch(function() {
+        return caches.match(event.request);
       })
     );
     return;
   }
 
-  // App shell — cache first, network fallback
+  // Everything else — cache first, network fallback
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request);
+    caches.match(event.request).then(function(cached) {
+      if (cached) return cached;
+      return fetch(event.request).then(function(response) {
+        // Cache new successful responses
+        if (response.ok) {
+          var clone = response.clone();
+          caches.open(CACHE_NAME).then(function(cache) {
+            cache.put(event.request, clone);
+          });
+        }
+        return response;
+      }).catch(function() {
+        // Offline and not cached — return offline fallback for navigation
+        if (event.request.mode === 'navigate') {
+          return caches.match('./index.html');
+        }
+      });
     })
   );
 });
