@@ -2,7 +2,7 @@
   "name": "PaceUp — Virtual Pacer",
   "short_name": "PaceUp",
   "description": "Your AI virtual running pacer. Voice-guided companion for every run type.",
-  "start_url": "/",
+  "start_url": ".",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0A0E14",
