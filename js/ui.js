@@ -1,6 +1,7 @@
 /* ============================================================
    PaceUp — UI Module
-   Screen management, form builders, DOM helpers
+   Screen management, form builders, DOM helpers,
+   lock overlay, stop confirm modal
    ============================================================ */
 
 const UI = (() => {
@@ -38,12 +39,10 @@ const UI = (() => {
         html = fieldPace('Maximum pace (don\'t go faster than)', 6, 0,
           'min : sec per km — the pacer warns if you go faster');
         break;
-
       case 'tempo':
         html = fieldPace('Target tempo pace', 5, 15, 'min : sec per km — ±15 sec tolerance band');
         html += fieldNumber('Tempo distance (km)', 'cfg-dist', 5, 1, 30);
         break;
-
       case 'intervals':
         html = fieldPills('Interval distance', 'interval-dist-pills', [
           { val: 200, label: '200m' },
@@ -55,12 +54,10 @@ const UI = (() => {
         html += fieldPace('Target rep pace', 4, 30, 'min : sec per km pace');
         html += fieldNumber('Rest between reps (seconds)', 'cfg-rest', 90, 15, 600);
         break;
-
       case 'long':
         html = fieldPace('Target pace', 6, 30, 'min : sec per km');
         html += fieldNumber('Distance goal (km)', 'cfg-dist', 15, 5, 50);
         break;
-
       case 'race':
         html = fieldPills('Race distance', 'race-dist-pills', [
           { val: 5, label: '5K', selected: true },
@@ -72,15 +69,10 @@ const UI = (() => {
         break;
     }
 
-    // Voice settings (common to all)
     html += voiceSettings();
-
-    // Start button
     html += '<button class="start-btn" id="btn-start-run">Start Run</button>';
-
     container.innerHTML = html;
 
-    // Bind range slider
     const rng = document.getElementById('voice-freq');
     if (rng) {
       rng.addEventListener('input', () => {
@@ -165,25 +157,21 @@ const UI = (() => {
       case 'easy':
         cfg.maxPace = (parseInt(m.value) || 6) * 60 + (parseInt(s.value) || 0);
         break;
-
       case 'tempo':
         cfg.targetPace = (parseInt(m.value) || 5) * 60 + (parseInt(s.value) || 15);
         cfg.tolerance = 15;
         cfg.distance = parseFloat(document.getElementById('cfg-dist').value) || 5;
         break;
-
       case 'intervals':
         cfg.repDist = getSelectedPillValue('interval-dist-pills') || 400;
         cfg.reps = parseInt(document.getElementById('cfg-reps').value) || 8;
         cfg.targetPace = (parseInt(m.value) || 4) * 60 + (parseInt(s.value) || 30);
         cfg.restSeconds = parseInt(document.getElementById('cfg-rest').value) || 90;
         break;
-
       case 'long':
         cfg.targetPace = (parseInt(m.value) || 6) * 60 + (parseInt(s.value) || 30);
         cfg.distance = parseFloat(document.getElementById('cfg-dist').value) || 15;
         break;
-
       case 'race': {
         const h = parseInt(document.getElementById('cfg-hrs').value) || 0;
         cfg.distance = getSelectedPillValue('race-dist-pills') || 5;
@@ -211,6 +199,11 @@ const UI = (() => {
     document.getElementById('stat-distance').textContent = distKm;
     document.getElementById('stat-time').textContent = timeStr;
     document.getElementById('stat-avg-pace').textContent = avgPaceStr;
+
+    // Also update lock screen stats if visible
+    document.getElementById('lock-pace').textContent = paceStr;
+    document.getElementById('lock-dist').textContent = distKm;
+    document.getElementById('lock-time').textContent = timeStr;
   }
 
   function updatePaceDisplay(status) {
@@ -250,10 +243,6 @@ const UI = (() => {
     }
   }
 
-  function setLockButton(isLocked) {
-    document.getElementById('lock-btn').textContent = isLocked ? '🔓' : '🔒';
-  }
-
   function showGPSOverlay(show) {
     document.getElementById('gps-overlay').classList.toggle('hidden', !show);
   }
@@ -270,7 +259,7 @@ const UI = (() => {
     const el = document.getElementById('countdown-num');
     el.textContent = n;
     el.style.animation = 'none';
-    void el.offsetWidth; // force reflow
+    void el.offsetWidth;
     el.style.animation = 'count-pulse 0.6s ease-out';
   }
 
@@ -278,6 +267,28 @@ const UI = (() => {
     const btn = document.getElementById('voice-toggle-btn');
     btn.textContent = enabled ? '🔊' : '🔇';
     btn.classList.toggle('muted', !enabled);
+  }
+
+  // ─── LOCK OVERLAY ───
+
+  function showLockOverlay(show) {
+    document.getElementById('lock-overlay').classList.toggle('hidden', !show);
+  }
+
+  function isLockVisible() {
+    return !document.getElementById('lock-overlay').classList.contains('hidden');
+  }
+
+  // ─── STOP CONFIRM MODAL ───
+
+  function showStopModal(distKm, timeStr) {
+    document.getElementById('stop-modal-info').textContent =
+      distKm + ' km · ' + timeStr;
+    document.getElementById('stop-modal').classList.remove('hidden');
+  }
+
+  function hideStopModal() {
+    document.getElementById('stop-modal').classList.add('hidden');
   }
 
   // ─── Summary screen ───
@@ -293,21 +304,20 @@ const UI = (() => {
 
     if (runType === 'race') {
       const goalDiff = Math.round(elapsed - config.goalTime);
-      const str = goalDiff <= 0 ? `${Math.abs(goalDiff)}s ahead` : `${goalDiff}s behind`;
+      const str = goalDiff <= 0 ? Math.abs(goalDiff) + 's ahead' : goalDiff + 's behind';
       const clr = goalDiff <= 0 ? 'var(--green)' : 'var(--red)';
-      statsHtml += `<div class="summary-card"><div class="val" style="color:${clr}">${str}</div><div class="lbl">vs Goal</div></div>`;
+      statsHtml += '<div class="summary-card"><div class="val" style="color:' + clr + '">' + str + '</div><div class="lbl">vs Goal</div></div>';
     } else if (runType === 'intervals') {
-      statsHtml += `<div class="summary-card"><div class="val">${intervalRep} / ${config.reps}</div><div class="lbl">Reps Done</div></div>`;
+      statsHtml += '<div class="summary-card"><div class="val">' + intervalRep + ' / ' + config.reps + '</div><div class="lbl">Reps Done</div></div>';
     } else {
       const cals = Math.round(distKm * 62);
-      statsHtml += `<div class="summary-card"><div class="val">${cals}</div><div class="lbl">Est. Calories</div></div>`;
+      statsHtml += '<div class="summary-card"><div class="val">' + cals + '</div><div class="lbl">Est. Calories</div></div>';
     }
 
     document.getElementById('summary-stats').innerHTML = statsHtml;
 
-    // Splits
     let splitsHtml = '';
-    splits.forEach(s => {
+    splits.forEach(function(s) {
       const target = config.targetPace || config.maxPace;
       let color = 'var(--text)';
       if (target) {
@@ -315,11 +325,11 @@ const UI = (() => {
         else if (s.time > target + 15) color = 'var(--amber)';
         else color = 'var(--green)';
       }
-      splitsHtml += `
-        <div class="split-row">
-          <span class="km">Km ${s.km}</span>
-          <span class="pace" style="color:${color}">${GPS.formatPace(s.time)}</span>
-        </div>`;
+      splitsHtml +=
+        '<div class="split-row">' +
+          '<span class="km">Km ' + s.km + '</span>' +
+          '<span class="pace" style="color:' + color + '">' + GPS.formatPace(s.time) + '</span>' +
+        '</div>';
     });
 
     document.getElementById('splits-list').innerHTML = splitsHtml ||
@@ -338,12 +348,15 @@ const UI = (() => {
     showIntervalBar,
     updateIntervalBar,
     setPauseButton,
-    setLockButton,
     showGPSOverlay,
     setGPSMessage,
     showCountdown,
     setCountdownNumber,
     setVoiceToggle,
+    showLockOverlay,
+    isLockVisible,
+    showStopModal,
+    hideStopModal,
     buildSummary
   };
 
