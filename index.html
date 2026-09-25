@@ -8,80 +8,171 @@
   <meta name="theme-color" content="#0A0E14">
   <meta name="description" content="PaceUp — Your AI virtual pacer. Voice-guided running companion for every run type.">
   <title>PaceUp — Virtual Pacer</title>
-
-  <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-
-  <!-- Leaflet CSS (maps) -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-
-  <!-- App CSS -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-  <!-- ===================== HOME SCREEN ===================== -->
-  <div id="home" class="screen active">
-    <div class="home-header">
-      <div class="logo">PACEUP</div>
-      <h1>Your virtual pacer</h1>
-      <p>Choose your run type. Your pacer adapts its voice and behavior to match.</p>
+  <!-- ====== APP SHELL WITH TAB NAV ====== -->
+  <div id="app-shell">
+
+    <!-- TAB: RUN (HOME) -->
+    <div id="tab-run" class="tab-screen active">
+      <div class="tab-scroll">
+        <div class="home-top">
+          <div class="greeting" id="greeting">Good morning</div>
+          <div class="app-wordmark">PACEUP</div>
+        </div>
+
+        <!-- Last run card -->
+        <div id="last-run-card" class="last-run-card hidden">
+          <div class="lrc-header">
+            <span class="lrc-label">Last run</span>
+            <span class="lrc-date" id="lrc-date"></span>
+          </div>
+          <div class="lrc-stats">
+            <div class="lrc-stat"><div class="lrc-val" id="lrc-dist">—</div><div class="lrc-lbl">km</div></div>
+            <div class="lrc-divider"></div>
+            <div class="lrc-stat"><div class="lrc-val" id="lrc-time">—</div><div class="lrc-lbl">time</div></div>
+            <div class="lrc-divider"></div>
+            <div class="lrc-stat"><div class="lrc-val" id="lrc-pace">—</div><div class="lrc-lbl">pace</div></div>
+          </div>
+        </div>
+
+        <!-- Weekly stats -->
+        <div class="week-strip" id="week-strip">
+          <div class="week-stat"><div class="week-val" id="week-runs">0</div><div class="week-lbl">runs</div></div>
+          <div class="week-stat"><div class="week-val" id="week-dist">0</div><div class="week-lbl">km</div></div>
+          <div class="week-stat"><div class="week-val" id="week-time">0</div><div class="week-lbl">min</div></div>
+        </div>
+
+        <!-- Section label -->
+        <div class="section-label">Start a run</div>
+
+        <!-- Run type cards -->
+        <div class="run-types">
+          <div class="run-type-card" data-type="easy">
+            <div class="rtc-icon icon-easy">🚶</div>
+            <div class="rtc-body"><div class="rtc-name">Easy Run</div><div class="rtc-desc">Recovery pace. Stay relaxed.</div></div>
+            <div class="rtc-arrow">›</div>
+          </div>
+          <div class="run-type-card" data-type="tempo">
+            <div class="rtc-icon icon-tempo">⚡</div>
+            <div class="rtc-body"><div class="rtc-name">Tempo Run</div><div class="rtc-desc">Comfortably hard. Tight pace band.</div></div>
+            <div class="rtc-arrow">›</div>
+          </div>
+          <div class="run-type-card" data-type="intervals">
+            <div class="rtc-icon icon-intervals">🔥</div>
+            <div class="rtc-body"><div class="rtc-name">Intervals</div><div class="rtc-desc">400m–1000m drills with rest.</div></div>
+            <div class="rtc-arrow">›</div>
+          </div>
+          <div class="run-type-card" data-type="long">
+            <div class="rtc-icon icon-long">🏔️</div>
+            <div class="rtc-body"><div class="rtc-name">Long Run</div><div class="rtc-desc">Build endurance. Patient coaching.</div></div>
+            <div class="rtc-arrow">›</div>
+          </div>
+          <div class="run-type-card" data-type="race">
+            <div class="rtc-icon icon-race">🏁</div>
+            <div class="rtc-body"><div class="rtc-name">Race Mode</div><div class="rtc-desc">5K to marathon. Goal-time pacing.</div></div>
+            <div class="rtc-arrow">›</div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="run-types">
-      <div class="run-type-card" data-type="easy">
-        <div class="run-type-icon icon-easy">🚶</div>
-        <div class="run-type-info">
-          <h3>Easy Run</h3>
-          <p>Recovery pace. The pacer keeps you from going too fast.</p>
-        </div>
-      </div>
-      <div class="run-type-card" data-type="tempo">
-        <div class="run-type-icon icon-tempo">⚡</div>
-        <div class="run-type-info">
-          <h3>Tempo Run</h3>
-          <p>Comfortably hard. Hold a steady pace in a tight band.</p>
-        </div>
-      </div>
-      <div class="run-type-card" data-type="intervals">
-        <div class="run-type-icon icon-intervals">🔥</div>
-        <div class="run-type-info">
-          <h3>Intervals</h3>
-          <p>400m / 800m drills. Work and rest with rep tracking.</p>
-        </div>
-      </div>
-      <div class="run-type-card" data-type="long">
-        <div class="run-type-icon icon-long">🏔️</div>
-        <div class="run-type-info">
-          <h3>Long Run</h3>
-          <p>Build endurance. Gentle pace checks, patient coaching.</p>
-        </div>
-      </div>
-      <div class="run-type-card" data-type="race">
-        <div class="run-type-icon icon-race">🏁</div>
-        <div class="run-type-info">
-          <h3>Race Mode</h3>
-          <p>5K to full marathon. Set a goal time, get split-by-split pacing.</p>
+
+    <!-- TAB: HISTORY -->
+    <div id="tab-history" class="tab-screen">
+      <div class="tab-scroll">
+        <div class="tab-header">Activity</div>
+        <div id="history-list"></div>
+        <div id="history-empty" class="empty-state">
+          <div class="empty-icon">📊</div>
+          <div class="empty-title">No runs yet</div>
+          <div class="empty-desc">Complete your first run and it will appear here.</div>
         </div>
       </div>
     </div>
+
+    <!-- TAB: SETTINGS -->
+    <div id="tab-settings" class="tab-screen">
+      <div class="tab-scroll">
+        <div class="tab-header">Settings</div>
+        <div class="settings-group">
+          <div class="settings-group-label">Preferences</div>
+          <div class="setting-row" id="setting-units">
+            <div class="setting-info"><div class="setting-name">Units</div><div class="setting-val" id="units-val">Kilometers</div></div>
+            <div class="setting-action"><div class="pill-sm selected" data-val="km">km</div><div class="pill-sm" data-val="mi">mi</div></div>
+          </div>
+        </div>
+        <div class="settings-group">
+          <div class="settings-group-label">Voice Pacer</div>
+          <div class="setting-row">
+            <div class="setting-info"><div class="setting-name">Default voice</div><div class="setting-val">Enabled</div></div>
+            <button class="toggle on" id="setting-voice-toggle"></button>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info"><div class="setting-name">Default frequency</div><div class="setting-val" id="setting-freq-val">30s</div></div>
+            <input type="range" class="range-input" id="setting-freq" min="10" max="60" value="30">
+          </div>
+        </div>
+        <div class="settings-group">
+          <div class="settings-group-label">Data</div>
+          <div class="setting-row clickable" id="setting-clear">
+            <div class="setting-info"><div class="setting-name" style="color:var(--red)">Clear run history</div></div>
+            <div class="rtc-arrow">›</div>
+          </div>
+        </div>
+        <div class="settings-group">
+          <div class="settings-group-label">About</div>
+          <div class="setting-row">
+            <div class="setting-info"><div class="setting-name">Version</div></div>
+            <div class="setting-val-right">1.0.0</div>
+          </div>
+          <a href="privacy.html" class="setting-row clickable" style="text-decoration:none;color:inherit">
+            <div class="setting-info"><div class="setting-name">Privacy policy</div></div>
+            <div class="rtc-arrow">›</div>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- BOTTOM TAB BAR -->
+    <nav class="tab-bar">
+      <button class="tab-btn active" data-tab="tab-run">
+        <span class="tab-icon">🏃</span>
+        <span class="tab-label">Run</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-history">
+        <span class="tab-icon">📊</span>
+        <span class="tab-label">Activity</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-settings">
+        <span class="tab-icon">⚙️</span>
+        <span class="tab-label">Settings</span>
+      </button>
+    </nav>
   </div>
 
-  <!-- ===================== SETUP SCREEN ===================== -->
-  <div id="setup" class="screen">
+  <!-- ====== SETUP SCREEN (slides over tabs) ====== -->
+  <div id="setup" class="overlay-screen">
     <div class="setup-header">
       <button class="back-btn" id="btn-back-home">←</button>
       <h2 id="setup-title">Setup</h2>
     </div>
-    <div id="setup-fields"></div>
+    <div class="overlay-scroll">
+      <div id="setup-fields"></div>
+    </div>
   </div>
 
-  <!-- ===================== ACTIVE RUN SCREEN ===================== -->
-  <div id="active-run" class="screen">
+  <!-- ====== ACTIVE RUN SCREEN ====== -->
+  <div id="active-run" class="overlay-screen">
     <div class="run-map-area">
       <div id="map"></div>
-
-      <!-- Pace status overlay -->
       <div class="pace-bar">
         <div class="pace-status">
           <span class="pace-dot green" id="pace-dot"></span>
@@ -89,30 +180,21 @@
         </div>
         <span class="run-type-badge" id="run-type-badge">EASY</span>
       </div>
-
-      <!-- Map buttons -->
       <button class="voice-toggle" id="voice-toggle-btn">🔊</button>
       <button class="center-btn" id="center-btn">◎</button>
-
-      <!-- GPS acquiring overlay -->
       <div class="gps-overlay" id="gps-overlay">
         <div class="gps-spinner"></div>
         <p id="gps-overlay-msg">Acquiring GPS signal...</p>
       </div>
-
-      <!-- Countdown overlay -->
       <div class="countdown-overlay hidden" id="countdown-overlay">
         <div class="countdown-num" id="countdown-num">3</div>
       </div>
     </div>
-
-    <!-- Bottom stats panel -->
     <div class="stats-panel">
       <div class="interval-bar" id="interval-bar">
         <span class="rep-info" id="rep-info">Rep 1 / 8</span>
         <span class="phase-badge phase-work" id="phase-badge">WORK</span>
       </div>
-
       <div class="stats-main">
         <div class="big-pace">
           <div class="value" id="current-pace">--:--</div>
@@ -120,22 +202,11 @@
           <div class="target-indicator" id="target-indicator"></div>
         </div>
       </div>
-
       <div class="stats-grid">
-        <div class="stat-cell">
-          <div class="val" id="stat-distance">0.00</div>
-          <div class="lbl">km</div>
-        </div>
-        <div class="stat-cell">
-          <div class="val" id="stat-time">00:00</div>
-          <div class="lbl">time</div>
-        </div>
-        <div class="stat-cell">
-          <div class="val" id="stat-avg-pace">--:--</div>
-          <div class="lbl">avg pace</div>
-        </div>
+        <div class="stat-cell"><div class="val" id="stat-distance">0.00</div><div class="lbl">km</div></div>
+        <div class="stat-cell"><div class="val" id="stat-time">00:00</div><div class="lbl">time</div></div>
+        <div class="stat-cell"><div class="val" id="stat-avg-pace">--:--</div><div class="lbl">avg pace</div></div>
       </div>
-
       <div class="run-controls">
         <button class="ctrl-btn btn-lock" id="lock-btn">🔒</button>
         <button class="ctrl-btn btn-pause" id="pause-btn">⏸ Pause</button>
@@ -144,38 +215,31 @@
     </div>
   </div>
 
-  <!-- ===================== SUMMARY SCREEN ===================== -->
-  <div id="summary" class="screen">
-    <div class="summary-header">
-      <div class="check">✓</div>
-      <h2>Run Complete</h2>
-      <p id="summary-subtitle"></p>
+  <!-- ====== SUMMARY SCREEN ====== -->
+  <div id="summary" class="overlay-screen">
+    <div class="overlay-scroll">
+      <div class="summary-header">
+        <div class="check">✓</div>
+        <h2>Run Complete</h2>
+        <p id="summary-subtitle"></p>
+      </div>
+      <div class="summary-stats" id="summary-stats"></div>
+      <div id="summary-map"></div>
+      <div class="splits-section" id="splits-section">
+        <h3>Kilometer Splits</h3>
+        <div id="splits-list"></div>
+      </div>
+      <button class="primary-btn" id="btn-done">Done</button>
+      <button class="secondary-btn" id="btn-export">📤 Export GPX</button>
     </div>
-    <div class="summary-stats" id="summary-stats"></div>
-    <div id="summary-map"></div>
-    <div class="splits-section" id="splits-section">
-      <h3>Kilometer Splits</h3>
-      <div id="splits-list"></div>
-    </div>
-    <button class="done-btn" id="btn-done">Done</button>
-    <button class="done-btn export-btn" id="btn-export">📤 Export GPX</button>
   </div>
 
-  <!-- ===================== LOCK SCREEN OVERLAY ===================== -->
-  <div id="lock-overlay" class="lock-overlay hidden">
+  <!-- ====== LOCK SCREEN OVERLAY ====== -->
+  <div id="lock-overlay" class="lock-overlay">
     <div class="lock-stats">
-      <div class="lock-stat">
-        <div class="lock-stat-val" id="lock-pace">--:--</div>
-        <div class="lock-stat-lbl">pace</div>
-      </div>
-      <div class="lock-stat">
-        <div class="lock-stat-val" id="lock-dist">0.00</div>
-        <div class="lock-stat-lbl">km</div>
-      </div>
-      <div class="lock-stat">
-        <div class="lock-stat-val" id="lock-time">00:00</div>
-        <div class="lock-stat-lbl">time</div>
-      </div>
+      <div class="lock-stat"><div class="lock-stat-val" id="lock-pace">--:--</div><div class="lock-stat-lbl">pace</div></div>
+      <div class="lock-stat"><div class="lock-stat-val" id="lock-dist">0.00</div><div class="lock-stat-lbl">km</div></div>
+      <div class="lock-stat"><div class="lock-stat-val" id="lock-time">00:00</div><div class="lock-stat-lbl">time</div></div>
     </div>
     <div class="lock-icon">🔒</div>
     <p class="lock-hint">Screen locked — safe for pocket</p>
@@ -187,8 +251,8 @@
     </div>
   </div>
 
-  <!-- ===================== STOP CONFIRM MODAL ===================== -->
-  <div id="stop-modal" class="modal-overlay hidden">
+  <!-- ====== STOP CONFIRM MODAL ====== -->
+  <div id="stop-modal" class="modal-overlay">
     <div class="modal-box">
       <p class="modal-title">End this run?</p>
       <p class="modal-subtitle" id="stop-modal-info"></p>
@@ -199,7 +263,7 @@
     </div>
   </div>
 
-  <!-- ===================== SCRIPTS ===================== -->
+  <!-- ====== SCRIPTS ====== -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="js/gps.js"></script>
   <script src="js/voice.js"></script>
@@ -209,12 +273,11 @@
   <script src="js/history.js"></script>
   <script src="js/app.js"></script>
   <script>
-    // Register service worker for PWA / offline support
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
+      window.addEventListener('load', function() {
         navigator.serviceWorker.register('./sw.js')
-          .then(reg => console.log('SW registered:', reg.scope))
-          .catch(err => console.log('SW registration failed:', err));
+          .then(function(reg) { console.log('SW registered:', reg.scope); })
+          .catch(function(err) { console.log('SW failed:', err); });
       });
     }
   </script>
