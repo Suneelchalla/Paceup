@@ -4,19 +4,20 @@
    ============================================================ */
 
 const CACHE_NAME = 'paceup-v1';
-const APP_SHELL = [
-  '/',
-  '/index.html',
-  '/css/style.css',
-  '/js/gps.js',
-  '/js/voice.js',
-  '/js/pacer.js',
-  '/js/map.js',
-  '/js/ui.js',
-  '/js/app.js',
-  '/manifest.json',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
+// Paths are resolved relative to SW scope at runtime
+const APP_SHELL_RELATIVE = [
+  './',
+  './index.html',
+  './css/style.css',
+  './js/gps.js',
+  './js/voice.js',
+  './js/pacer.js',
+  './js/map.js',
+  './js/ui.js',
+  './js/app.js',
+  './manifest.json',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
 ];
 
 // External CDN resources (cache on first use)
@@ -29,7 +30,7 @@ const CDN_RESOURCES = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(APP_SHELL);
+      return cache.addAll(APP_SHELL_RELATIVE);
     })
   );
   self.skipWaiting();
